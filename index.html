@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>発表順スロット</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #080818;
+      background-image: radial-gradient(ellipse at 50% -5%, rgba(255,215,0,0.13) 0%, transparent 55%);
+      color: #fff;
+      font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      gap: 1.8rem;
+    }
+
+    h1 {
+      font-size: clamp(1.3rem, 4vw, 2rem);
+      color: #ffd700;
+      text-shadow: 0 0 40px rgba(255,215,0,0.55);
+      letter-spacing: 0.15em;
+    }
+
+    .layout {
+      display: flex;
+      gap: 2.5rem;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* ── Slot section ── */
+    .slot-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    .round-badge {
+      font-size: 0.88rem;
+      color: #888;
+      letter-spacing: 0.08em;
+    }
+    .round-badge strong {
+      color: #ffd700;
+      font-size: 1.5rem;
+      vertical-align: middle;
+    }
+
+    .machine {
+      background: #11112a;
+      border: 3px solid #ffd700;
+      border-radius: 22px;
+      padding: 1.6rem;
+      box-shadow: 0 0 70px rgba(255,215,0,0.14), inset 0 1px 0 rgba(255,255,255,0.04);
+      position: relative;
+    }
+    .machine::before {
+      content: '🎰';
+      position: absolute;
+      top: -1.4rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 2rem;
+    }
+
+    /* window */
+    .slot-window {
+      width: 340px;
+      height: 140px;
+      overflow: hidden;
+      position: relative;
+      background: #000;
+      border-radius: 10px;
+      border: 2px solid #222244;
+    }
+
+    .fade-top, .fade-bot {
+      position: absolute;
+      left: 0; right: 0;
+      height: 40%;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .fade-top { top: 0;    background: linear-gradient(to bottom, rgba(0,0,0,.93), transparent); }
+    .fade-bot { bottom: 0; background: linear-gradient(to top,   rgba(0,0,0,.93), transparent); }
+
+    .hl-bar {
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      height: 140px;
+      transform: translateY(-50%);
+      border-top: 2px solid rgba(255,215,0,.38);
+      border-bottom: 2px solid rgba(255,215,0,.38);
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .reel {
+      position: absolute;
+      width: 100%;
+      top: 0;
+      will-change: transform;
+    }
+
+    .reel-item {
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #fff;
+      padding: 0 1rem;
+      line-height: 1.5;
+    }
+
+    @keyframes winGlow {
+      0%,100% { box-shadow: 0 0 10px rgba(255,215,0,.3); border-color: #222244; }
+      50%      { box-shadow: 0 0 55px rgba(255,215,0,.95), inset 0 0 18px rgba(255,215,0,.2); border-color: #ffd700; }
+    }
+    .slot-window.glow { animation: winGlow 0.5s ease 3; }
+
+    /* buttons */
+    .spin-btn {
+      padding: .85rem 3.5rem;
+      font-size: 1.3rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #ffd700, #ff8c00);
+      color: #000;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      letter-spacing: .13em;
+      box-shadow: 0 5px 28px rgba(255,130,0,.42);
+      transition: transform .14s, box-shadow .14s;
+    }
+    .spin-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 36px rgba(255,130,0,.65); }
+    .spin-btn:active:not(:disabled) { transform: translateY(0); }
+    .spin-btn:disabled { background: #2e2e4e; color: #555; box-shadow: none; cursor: default; }
+
+    .rem-note {
+      font-size: .78rem;
+      color: #555;
+      letter-spacing: .06em;
+    }
+
+    .complete-msg {
+      display: none;
+      font-size: .95rem;
+      color: #ffd700;
+      border: 1px solid rgba(255,215,0,.4);
+      padding: .8rem 1.5rem;
+      border-radius: 10px;
+      background: rgba(255,215,0,.07);
+      text-align: center;
+    }
+
+    /* ── Results ── */
+    .results { width: 285px; }
+
+    .results-hd {
+      font-size: .95rem;
+      color: #ffd700;
+      letter-spacing: .1em;
+      padding-bottom: .55rem;
+      border-bottom: 1px solid rgba(255,215,0,.25);
+      margin-bottom: .75rem;
+    }
+
+    .result-list { list-style: none; display: flex; flex-direction: column; gap: .42rem; }
+
+    .result-item {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .52rem .85rem;
+      background: rgba(255,215,0,.07);
+      border: 1px solid rgba(255,215,0,.2);
+      border-radius: 9px;
+      animation: slideIn .38s ease both;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-18px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .r-num { font-size: 1.15rem; font-weight: bold; color: #ffd700; min-width: 1.7rem; text-align: right; }
+    .r-name { font-size: .83rem; line-height: 1.45; color: #ddd; }
+  </style>
+</head>
+<body>
+
+<h1>🎰　発表順スロット　🎰</h1>
+
+<div class="layout">
+
+  <div class="slot-section">
+    <div class="round-badge" id="roundBadge">第 <strong id="roundNum">1</strong> 番を決定中</div>
+
+    <div class="machine">
+      <div class="slot-window" id="slotWin">
+        <div class="reel" id="reel"></div>
+        <div class="fade-top"></div>
+        <div class="fade-bot"></div>
+        <div class="hl-bar"></div>
+      </div>
+    </div>
+
+    <button class="spin-btn" id="spinBtn" onclick="spin()">SPIN !</button>
+    <div class="rem-note" id="remNote">残り 11 チーム</div>
+    <div class="complete-msg" id="completeMsg">🎉 全チームの発表順が決定しました！</div>
+  </div>
+
+  <div class="results">
+    <div class="results-hd">📋 発表順</div>
+    <ul class="result-list" id="resultList"></ul>
+  </div>
+
+</div>
+
+<script>
+// ── チームリスト ──────────────────────────────────────
+const TEAMS = [
+  '気仙地区学生奉仕団\n（岩手県）',
+  '宮城県立南三陸高等学校\n（宮城県）',
+  '茨城県立水海道第一高等学校\n（茨城県・常総市）',
+  '茨城県立古河中等教育学校\n（茨城県・古河市）',
+  'Blue Campus\n（埼玉県）',
+  '東京都立国分寺高等学校\n（東京都・国分寺市）',
+  '聖徳学園高等学校\n（東京都・武蔵野市）',
+  '青葉区チーム\n（神奈川県・横浜市）',
+  'アレセイア湘南高等学校\n-BIG WAVE-\n（神奈川県・茅ヶ崎市）',
+  '富士宮高校会議所\n（静岡県）',
+  'CTDJapan\n（沖縄県）'
+];
+
+// ── 定数 ─────────────────────────────────────────────
+const ITEM_H  = 140;   // .reel-item の高さ (px) ← CSS と合わせる
+const REPS    = 14;    // リールに何周分並べるか
+const SPIN_MS = 3400;  // スピン時間 (ms)
+
+// ── 状態 ─────────────────────────────────────────────
+let remaining = [...TEAMS];
+let order     = [];
+let spinning  = false;
+let audioCtx  = null;
+
+// ── リール構築 ───────────────────────────────────────
+function buildReel(teams) {
+  const reel  = document.getElementById('reel');
+  const items = Array(REPS).fill(teams).flat();
+  reel.innerHTML = items
+    .map(t => `<div class="reel-item">${t.replace(/\n/g, '<br>')}</div>`)
+    .join('');
+  reel.style.transform = 'translateY(0px)';
+}
+
+buildReel(remaining);
+
+// ── ドラムロール (Web Audio API) ──────────────────────
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function snare(time, vol) {
+  const sr  = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, Math.ceil(sr * 0.065), sr);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) {
+    d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sr * 0.016)) * vol;
+  }
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const g = audioCtx.createGain();
+  g.gain.value = 1;
+  src.connect(g);
+  g.connect(audioCtx.destination);
+  src.start(time);
+}
+
+function scheduleDrum(durationMs) {
+  initAudio();
+  const now = audioCtx.currentTime + 0.06;
+  const end = now + durationMs / 1000;
+  let t = now;
+  while (t < end) {
+    const prog = (t - now) / (end - now);
+    snare(t, 0.22 + prog * 0.58);
+    // 間隔: 42ms（速い）→ 290ms（遅い）
+    t += 0.042 + prog * prog * 0.248;
+  }
+  snare(end, 1.0); // 最後にドン！
+}
+
+// ── スピン ────────────────────────────────────────────
+function spin() {
+  if (spinning || remaining.length === 0) return;
+  spinning = true;
+  document.getElementById('spinBtn').disabled = true;
+  document.getElementById('slotWin').classList.remove('glow');
+
+  // 当選チームを決める
+  const winIdx = Math.floor(Math.random() * remaining.length);
+  const winner = remaining[winIdx];
+
+  buildReel(remaining);
+  const reel = document.getElementById('reel');
+
+  // 目標位置: 中央の周回 (REPS/2) の当選アイテムが画面中央に来るY座標
+  const midRep  = Math.floor(REPS / 2);
+  const targetY = -((midRep * remaining.length + winIdx) * ITEM_H);
+
+  scheduleDrum(SPIN_MS);
+
+  let t0 = null;
+
+  // cubic ease-out
+  function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
+
+  function frame(ts) {
+    if (!t0) t0 = ts;
+    const prog = Math.min((ts - t0) / SPIN_MS, 1);
+    reel.style.transform = `translateY(${easeOut(prog) * targetY}px)`;
+
+    if (prog < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      reel.style.transform = `translateY(${targetY}px)`;
+      onDone(winner, winIdx);
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function onDone(winner, winIdx) {
+  document.getElementById('slotWin').classList.add('glow');
+
+  // glow アニメ終了後 (0.5s × 3 = 1.5s) に確定処理
+  setTimeout(() => {
+    remaining.splice(winIdx, 1);
+    order.push(winner);
+    addResult(order.length, winner);
+
+    if (remaining.length === 0) {
+      document.getElementById('spinBtn').style.display    = 'none';
+      document.getElementById('roundBadge').style.display = 'none';
+      document.getElementById('remNote').style.display    = 'none';
+      document.getElementById('completeMsg').style.display = 'block';
+    } else {
+      document.getElementById('spinBtn').disabled         = false;
+      document.getElementById('roundNum').textContent     = order.length + 1;
+      document.getElementById('remNote').textContent      = `残り ${remaining.length} チーム`;
+      buildReel(remaining);
+    }
+    spinning = false;
+  }, 1550);
+}
+
+function addResult(num, team) {
+  const li = document.createElement('li');
+  li.className = 'result-item';
+  li.innerHTML = `
+    <span class="r-num">${num}</span>
+    <span class="r-name">${team.replace(/\n/g, '<br>')}</span>`;
+  document.getElementById('resultList').appendChild(li);
+}
+</script>
+</body>
+</html>
